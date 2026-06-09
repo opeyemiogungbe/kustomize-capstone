@@ -17,9 +17,10 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: role-to-assume: arn:aws:iam::243919537980:role/github-actions-eks-role
-          aws-region: us-east-1
-      
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1   
+
       - name: Set up Kubectl
         uses: azure/setup-kubectl@v1
         
@@ -33,10 +34,10 @@ jobs:
             --name my-kustomize-cluster
 
       - name: Verify Cluster Access
-        run: |
+        run:
           kubectl cluster-info
           kubectl get nodes
 
       - name: Deploy Kustomize
-        run: |
+        run:
           kubectl apply -k overlay/dev
