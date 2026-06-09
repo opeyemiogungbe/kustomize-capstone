@@ -1,0 +1,41 @@
+name: Deploy with kustomize
+on:
+  push:
+    branches:
+      - main
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::243919537980:user/Kustomiz
+          aws-region: us-east-1
+      
+      - name: Set up Kubectl
+        uses: azure/setup-kubectl@v1
+        name: Setup kustomize
+        uses: imranismail/setup-kustomize@v1
+
+      - name: Configure kubectl
+        run:
+          aws eks update-kubeconfig 
+            --region us-east-1 
+            --name my-kustomize-cluster
+
+      - name: Verify Cluster Access
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Deploy Kustomize
+        run: |
+          kubectl apply -k overlay/dev
