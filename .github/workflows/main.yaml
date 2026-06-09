@@ -28,16 +28,16 @@ jobs:
         uses: imranismail/setup-kustomize@v1
 
       - name: Configure kubectl
-        run:
+        run: |
           aws eks update-kubeconfig \
-            --region us-east-1 \
-            --name my-kustomize-cluster
+          --region us-east-1 \
+          --name my-kustomize-cluster
 
       - name: Verify Cluster Access
-        run:
-          kubectl cluster-info
-          kubectl get nodes
+        run: |
+         kubectl cluster-info
+         kubectl get nodes
 
       - name: Deploy Kustomize
-        run:
+        run: |
           kubectl apply -k overlay/dev
