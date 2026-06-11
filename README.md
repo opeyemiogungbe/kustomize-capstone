@@ -1,203 +1,269 @@
-# 🚀 Advance Configuration Management with Kustomize and AWS
+# 🚀 Advanced Kubernetes Configuration Management with Kustomize
 
-This project demonstrates a **real-world Kubernetes deployment workflow** using:
+This repository demonstrates a clean, environment-aware Kubernetes deployment using Kustomize overlays.
 
-- Kubernetes (EKS-ready)
-- Kustomize (multi-environment configuration)
-- ConfigMaps & Secrets (application configuration)
-- Environment-based overlays (dev, staging, prod)
-- AWS EKS integration using `eksctl`
-- kubectl deployment workflow
+It includes:
+- A single reusable base manifest for one application
+- ConfigMap and Secret generation via Kustomize
+- Environment overlays for `dev`, `staging`, and `prod`
+- Resource name isolation with prefixes
+- Environment-specific replica counts and labels
 
-# 📌 Project Overview
+---
 
-This project shows how to manage **multiple environments (dev, staging, production)** using Kustomize overlays instead of duplicating YAML files.
-
-It follows DevOps best practices:
-
-- Infrastructure consistency
-- Environment isolation
-- Config separation (ConfigMaps & Secrets)
-- Declarative deployment model
-
-## 🏗️ Architecture
+## 📁 Repository structure
 
 ```
-myapp/
-├── base/
+.
+├── LICENSE
+├── README.md
+├── base
 │   ├── deployment.yaml
-│   ├── service.yaml
-│   ├── kustomization.yaml
-│
-├── overlay/
-│   │
-│   ├── dev/
-│   │   ├── kustomization.yaml
-│   │   └── replica-count.yaml
-│   │
-│   ├── staging/
-│   │   ├── kustomization.yaml
-│   │   └── replica-count.yaml
-│   │
-│   └── prod/
-│       ├── kustomization.yaml
-│       └── replica-count.yaml
-│
-└── README.md
+│   └── kustomization.yaml
+└── overlay
+    ├── dev
+    │   ├── kustomization.yaml
+    │   └── replica_count.yaml
+    ├── staging
+    │   ├── kustomization.yaml
+    │   └── replica_count.yaml
+    └── prod
+        ├── kustomization.yaml
+        └── replica_count.yaml
 ```
 
-## ⚙️ Technologies Used
+---
 
-- Kubernetes
-- AWS EKS
-- eksctl
-- Kustomize
-- kubectl
-- Docker (for app containerization)
-- Git & GitHub
+## 🧠 What has been implemented so far
 
+### Base configuration
+The `base/` directory contains the core application resources used by all environments.
 
-## 🌍 Environment Strategy
+- `base/deployment.yaml` defines a single `Deployment` named `my-app`
+- `base/kustomization.yaml` includes the base deployment and generates:
+  - a `ConfigMap` named `my-configmap`
+  - a second `ConfigMap` named `my-app-config`
+  - a `Secret` named `my-secret`
 
-| Environment | Prefix   | Purpose |
-|-------------|----------|---------|
-| Dev         | dev-     | Local testing / development 
-| Staging     | staging- | Pre-production testing 
-| Prod        | prod-    | Production deployment 
-
-
-## 🧩 Key Features
-
-### 1. Kustomize Overlays
-Each environment has its own overlay:
-
-- dev
-- staging
-- prod
-
-Each overlay modifies:
-- Resource names (`namePrefix`)
-- Labels (`commonLabels`)
-- Configurations (environment-specific configurations)
-
-![Screenshot-2026-05-09-233401.png](https://i.postimg.cc/8zNSKn1x/Screenshot-2026-05-09-233401.png)
-
-![Screenshot-2026-05-09-233440.png](https://i.postimg.cc/qRnDd4wD/Screenshot-2026-05-09-233440.png)
-
-![Screenshot-2026-05-09-233426.png](https://i.postimg.cc/Ghz7RMFz/Screenshot-2026-05-09-233426.png)
-
-### 2. ConfigMaps (Application Config)
-
-We use this for non-sensitive configuration such as:
-
-- API URLs
-- environment variables
-- feature flags
-
-Example:
-
+The base deployment consumes the secret with:
 ```yaml
-configMapGenerator:
-- name: app-config
-  literals:
-  - API_URL=https://api.example.com
-  - ENV=dev
+envFrom:
+  - secretRef:
+      name: my-secret
+```
+Kustomize rewrites this reference to the generated hashed secret name automatically.
+
+### ConfigMaps and Secrets
+The base Kustomize configuration uses generator blocks:
+
+- `configMapGenerator`
+  - `my-configmap` contains `key1=value1` and `key2=value2`
+  - `my-app-config` contains `app_name=MyKustomizeApp` and `log_level=debug`
+- `secretGenerator`
+  - `my-secret` contains base64-encoded `username=admin` and `password=s3cr3t`
+
+This enables configuration separation without hardcoding sensitive values inside the deployment manifest.
+
+### Environment overlays
+Each overlay directory customizes the base for a specific environment.
+
+- `overlay/dev`
+- `overlay/staging`
+- `overlay/prod`
+
+Each overlay currently applies:
+- `namePrefix` to isolate resources across environments
+- `commonLabels` to add an `env` label
+- `patchesStrategicMerge` to set environment-specific replica counts
+
+Example behavior:
+- `dev` deploys `dev-my-app`
+- `staging` deploys `staging-my-app`
+- `prod` deploys `prod-my-app`
+
+---
+
+## 🔧 File details
+
+### `base/deployment.yaml`
+A minimal deployment for the app:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: app-container
+          image: myapp:latest
+          ports:
+            - containerPort: 80
+          envFrom:
+            - secretRef:
+                name: my-secret
 ```
 
-### 3. Secrets (Sensitive Data)
-
-We use this for saving sensitive credentials:
-
-- usernames
-- passwords
-- tokens
-
-Example:
-
-``` secretGenerator:
-- name: app-secret
+### `base/kustomization.yaml`
+Generates config and secret resources and includes the deployment:
+```yaml
+resources:
+  - deployment.yaml
+configMapGenerator:
+- name: my-configmap
+  literals:
+  - key1=value1
+  - key2=value2
+- name: my-app-config
+  literals:
+  - app_name=MyKustomizeApp
+  - log_level=debug
+secretGenerator:
+- name: my-secret
   literals:
   - username=admin
-  - password=12345
+  - password=s3cr3t
 ```
-Kustomize automatically encodes them using base64.
 
-### 4. Name Isolation (namePrefix)
+### Overlay files
+Each overlay references the base and patches the replica count.
 
-Each environment prefixes resources automatically like:
-
-dev-nginx-deployment
-
-staging-nginx-deployment
-
-prod-nginx-deployment
-
-This prevents resource collisions across environments.
-
-### 5. Labels (commonLabels)
-
-Used for identification and filtering:
-
+`overlay/dev/kustomization.yaml`:
+```yaml
+bases:
+  - ../../base
+patchesStrategicMerge:
+  - replica_count.yaml
+commonLabels:
+  env: development
+namePrefix: dev-
 ```
+
+`overlay/dev/replica_count.yaml` changes the replica count to `3`.
+
+`overlay/staging/kustomization.yaml`:
+```yaml
+bases:
+  - ../../base
+patchesStrategicMerge:
+  - replica_count.yaml
+commonLabels:
+  env: staging
+namePrefix: staging-
+```
+
+`overlay/staging/replica_count.yaml` sets `replicas: 2`.
+
+`overlay/prod/kustomization.yaml`:
+```yaml
+bases:
+  - ../../base
+patchesStrategicMerge:
+  - replica_count.yaml
+commonLabels:
+  env: production
+namePrefix: prod-
+```
+
+`overlay/prod/replica_count.yaml` sets `replicas: 1`.
+
+---
+
+## ✅ How to use this project
+
+### Preview rendered resources
+Render an overlay without applying it:
+```bash
+kubectl kustomize overlay/dev
+kubectl kustomize overlay/staging
+kubectl kustomize overlay/prod
+```
+
+### Apply an environment
+```bash
+kubectl apply -k overlay/dev
+kubectl apply -k overlay/staging
+kubectl apply -k overlay/prod
+```
+
+### Inspect generated resources
+After rendering, Kustomize produces hashed names for generated configmaps and secrets.
+For example, `my-secret` becomes something like `staging-my-secret-b892bc2827`.
+
+### Validate the staging environment first
+Use staging to test before promoting values to production:
+```bash
+kubectl apply -k overlay/staging
+kubectl get deployments,configmaps,secrets -l env=staging
 kubectl get pods -l env=staging
 ```
 
-## 🚀 Deployment Steps
+---
 
-### 1. Clone Repository
-- git clone (https://github.com/our-username/our-repo.git)
-- cd into our root directory
+## 🧪 What this repository demonstrates
 
-### 2. Configure AWS CLI (for EKS)
+- Kustomize config generators for `ConfigMap` and `Secret`
+- Environment-specific overlays with prefixes and labels
+- Patch-based customization for replica counts
+- Automatic rewriting of generated resource names
+- Deployment config that consumes Kustomize-generated secrets
 
-AWS configure. This helps us to connect our AWS account credentials with our terminal for easy execution of our commands.
+---
 
-### 3. Create EKS Cluster (if not existing)
+## 📌 Notes and next improvements
 
+### Current Kustomize syntax
+This repo currently uses older overlay syntax:
+- `bases` (deprecated) instead of `resources`
+- `commonLabels` (deprecated) instead of `labels`
+- `patchesStrategicMerge` (deprecated) instead of `patches`
+
+To modernize the overlays, run:
 ```bash
-eksctl create cluster \
---name my-kustomize-cluster \
---region us-east-1 \
---nodegroup-name my-nodes \
---node-type t3.medium \
---nodes 2 \
---nodes-min 1 \
---nodes-max 3 
-We use t3.medium which provides enough CPU/memory for Kubernetes workloads.
-```
-![Screenshot-2026-04-28-055249.png](https://i.postimg.cc/cJGNzMkt/Screenshot-2026-04-28-055249.png)]
-
-![Screenshot-2026-04-28-055305.png](https://i.postimg.cc/Dy4HK4Xb/Screenshot-2026-04-28-055305.png)]
-
-```
-### 4. Update kubeconfig
-
-```
-aws eks update-kubeconfig \
-  --region us-east-1 \
-  --name my-kustomize-cluster
+kustomize edit fix overlay/dev
+kustomize edit fix overlay/staging
+kustomize edit fix overlay/prod
 ```
 
-### 5. Verify Cluster
+### Future enhancements
+- Add a `Service` manifest for application exposure
+- Add environment-specific image tag overrides
+- Add a `namespace` field per overlay
+- Expand to multiple applications/services using app-specific bases
+- Add `kustomization.yaml` at root for multi-app aggregated deployment
 
-```bash
-kubectl get svc
+---
+
+## 💡 Recommended extension for multi-app scale
+When this project grows beyond one app, use a structure like:
+
 ```
-![Screenshot-2026-04-28-055844.png](https://i.postimg.cc/FH96kW6Z/Screenshot-2026-04-28-055844.png)
+apps/
+  frontend/
+    base/
+    overlay/
+  backend/
+    base/
+    overlay/
+common/
+  base/
+```
 
-### 6. Deploy Dev Environment
-   
-kubectl apply -k overlay/dev
+Each app gets its own base and overlays, and root overlays can compose them together.
 
-![dev deployment](https://i.postimg.cc/k5ThyT4B/Screenshot-2026-04-30-053448.png)
+---
 
-### 7. Deploy Staging Environment
+## 📄 License
+This project is licensed under the terms in `LICENSE`.
 
-kubectl apply -k overlay/staging
-
-![Screenshot-2026-04-30-053506.png](https://i.postimg.cc/8PkJ2wPy/Screenshot-2026-04-30-053506.png)
-
-### 8. Deploy Production Environment
 
 kubectl apply -k overlay/prod
 
