@@ -17,6 +17,9 @@ It includes:
 .
 ├── LICENSE
 ├── README.md
+├── .github
+│   └── workflows
+│       └── main.yaml
 ├── base
 │   ├── deployment.yaml
 │   └── kustomization.yaml
