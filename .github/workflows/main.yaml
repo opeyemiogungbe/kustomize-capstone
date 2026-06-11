@@ -49,3 +49,4 @@ jobs:
       - name: Deploy Kustomize
         run: |
           kubectl apply -k overlay/dev
+
