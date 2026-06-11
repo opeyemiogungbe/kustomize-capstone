@@ -6,10 +6,10 @@ configMapGenerator:
   literals:
   - key1=value1       # Key-value pairs
   - key2=value2
-  - name: my-app-config
-    literals:
-    - app_name=MyKustomizeApp
-    - log_level=debug
+- name: my-app-config
+  literals:
+  - app_name=MyKustomizeApp
+  - log_level=debug
 # base/kustomization.yaml
 secretGenerator:
 - name: my-secret     # Name of the Secret
