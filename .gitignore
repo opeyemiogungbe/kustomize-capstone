@@ -1,0 +1,37 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+*.log
+
+# JetBrains
+*.iml
+
+# Node modules (if using tooling)
+node_modules/
+
+# Environment files
+.env
+.env.*
+
+# Kustomize / generated output directories
+.kustomize/
+build/
+
+# Helm chart packaging (if added later)
+charts/
+*.tgz
+
+# Mac / Linux temp
+.session
+
+# Ignore backup files created by editors
+*.orig
