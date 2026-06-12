@@ -27,7 +27,7 @@ env:
   EKS_CLUSTER: my-kustomize-cluster
   IMAGE_REGISTRY: ghcr.io
   IMAGE_REPOSITORY: ${{ github.repository_owner }}/kustomize-capstone
-  IMAGE_URI: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:${{ github.sha }}
+  IMAGE_URI: ghcr.io/${{ github.repository_owner }}/kustomize-capstone:${{ github.sha }}
 
 jobs:
   deploy:
