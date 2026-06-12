@@ -1,8 +1,8 @@
 resources:
   - ../../base
-patchesStrategicMerge:
+patches:
   - replica_count.yaml
   - deployment_patch.yaml
-commonLabels:
+labels:
   env: staging  # Label applied to every resource
 namePrefix: staging-  # Prefix added to the name of all resources

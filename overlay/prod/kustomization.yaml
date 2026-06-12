@@ -1,8 +1,8 @@
 resources:
   - ../../base
-patchesStrategicMerge:
+patches:
   - replica_count.yaml
   - deployment_patch.yaml
-commonLabels:
+labels:
   env: production  # Label applied to every resource
 namePrefix: prod-  # Prefix added to the name of all resources

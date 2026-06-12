@@ -52,7 +52,15 @@ It includes:
 5. `imranismail/setup-kustomize@v1` installs `kustomize`.
 6. The workflow runs `aws eks update-kubeconfig --region us-east-1 --name my-kustomize-cluster`.
 7. It verifies cluster access with `kubectl cluster-info` and `kubectl get nodes`.
-8. It deploys the `dev` overlay with `kubectl apply -k overlay/dev`.
+8. It deploys the selected overlay with `kubectl apply -k .` after preparing a temporary deployment workspace.
+
+### What we fixed in this workflow
+- Resolved an invalid GitHub Actions top-level env expression for `IMAGE_URI`.
+- Updated Docker actions to supported versions and added Node.js 24 opt-in.
+- Fixed the Kustomize deploy step by copying both `base` and `overlay` into `/tmp/deploy`.
+- Updated overlay manifests to current Kustomize syntax using `patches` and `labels`.
+- Confirmed the workflow now triggers on `dev`, `staging`, and `main`.
+- Added required AWS GitHub secrets for credentials-based deployment.
 
 ![Screenshot-2026-06-09-105754.png](https://i.postimg.cc/cHZ0j53D/Screenshot-2026-06-09-105754.png)
 
@@ -181,15 +189,15 @@ Each overlay directory customizes the base for a specific environment. Each over
 #### `overlay/dev/kustomization.yaml`:
 
 ```yaml
-bases:
+resources:
   - ../../base
-patchesStrategicMerge:
+patches:
   - replica_count.yaml
-commonLabels:
+labels:
   env: development
 namePrefix: dev-
 ```
-`overlay/dev/replica_count.yaml` changes the replica count to `3`. After our initial CI\CD action, we decided to change replica count from 1-3 to see if our GitHub action runs successfully..
+`overlay/dev/replica_count.yaml` changes the replica count to `3`. After our initial CI/CD action, we decided to change replica count from 1-3 to see if our GitHub action runs successfully..
 
 ![Screenshot-2026-06-09-105043.png](https://i.postimg.cc/63Gbr9qY/Screenshot-2026-06-09-105043.png)
 
@@ -204,11 +212,11 @@ And yes, we got a successful trigger.
 #### `overlay/staging/kustomization.yaml`
 
 ```yaml
-bases:
+resources:
   - ../../base
-patchesStrategicMerge:
+patches:
   - replica_count.yaml
-commonLabels:
+labels:
   env: staging
 namePrefix: staging-
 ```
@@ -219,11 +227,11 @@ namePrefix: staging-
 #### `overlay/prod/kustomization.yaml`
 
 ```yaml
-bases:
+resources:
   - ../../base
-patchesStrategicMerge:
+patches:
   - replica_count.yaml
-commonLabels:
+labels:
   env: production
 namePrefix: prod-
 ```
@@ -233,8 +241,8 @@ namePrefix: prod-
 Each overlay currently applies:
 
 - `namePrefix` to isolate resources across environments
-- `commonLabels` to add an `env` label
-- `patchesStrategicMerge` to set environment-specific replica counts
+- `labels` to add an `env` label
+- `patches` to set environment-specific replica counts
 
 Example behavior:
 - `dev` deploys `dev-my-app`
@@ -272,6 +280,17 @@ kubectl get deployments,configmaps,secrets -l env=staging
 kubectl get pods -l env=staging
 ```
 
+### Verify a deployed environment
+After deployment, confirm the live resources in Kubernetes:
+```bash
+kubectl get nodes
+kubectl get deployments -l env=dev
+kubectl get pods -l env=dev
+kubectl describe deployment dev-my-app
+```
+
+You should see the `dev-my-app` deployment available and the cluster nodes in `Ready` status.
+
 ## 🧪 What this repository demonstrates
 
 - CI/CD integration with GitHub
@@ -285,17 +304,12 @@ kubectl get pods -l env=staging
 ## 📌 Notes and next improvements
 
 ### Current Kustomize syntax
-This repo currently uses older overlay syntax:
-- `bases` (deprecated) instead of `resources.`
-- `commonLabels` (deprecated) instead of `labels.`
-- `patchesStrategicMerge` (deprecated) instead of `patches.`
+This repo now uses current overlay syntax:
+- `resources` instead of `bases`
+- `labels` instead of `commonLabels`
+- `patches` instead of `patchesStrategicMerge`
 
-To modernize the overlays, run:
-```bash
-kustomize edit fix overlay/dev
-kustomize edit fix overlay/staging
-kustomize edit fix overlay/prod
-```
+The overlays have been updated so they no longer trigger deprecation warnings.
 
 ### Future enhancements
 - Add a `Service` manifest for application exposure
