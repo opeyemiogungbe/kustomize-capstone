@@ -4,5 +4,6 @@ patches:
   - replica_count.yaml
   - deployment_patch.yaml
 labels:
-  env: development # Label applied to every resource
+  - name: env
+    value: development # Label applied to every resource
 namePrefix: dev-  # Prefix added to the name of all resources

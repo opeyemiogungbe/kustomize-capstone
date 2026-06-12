@@ -4,5 +4,6 @@ patches:
   - replica_count.yaml
   - deployment_patch.yaml
 labels:
-  env: production  # Label applied to every resource
+  - name: env
+    value: production  # Label applied to every resource
 namePrefix: prod-  # Prefix added to the name of all resources

@@ -4,5 +4,6 @@ patches:
   - replica_count.yaml
   - deployment_patch.yaml
 labels:
-  env: staging  # Label applied to every resource
-namePrefix: staging-  # Prefix added to the name of all resources
+  - name: env
+    value: staging  # Label applied to every resource
+namePrefix: staging-  # Prefix added to every resource
