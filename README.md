@@ -188,6 +188,9 @@ argocd-repo-server
 argocd-redis
 argocd-dex-server
 ```
+![Screenshot-2026-06-13-054638.png](https://i.postimg.cc/RF4GPSTM/Screenshot-2026-06-13-054638.png)
+
+![Screenshot-2026-06-13-055108.png](https://i.postimg.cc/3rL9BH0w/Screenshot-2026-06-13-055108.png)
 
 ## Accessing the Argo CD UI
 
@@ -219,6 +222,8 @@ Password: <initial password>
 
 After logging in, change the admin password for security.
 
+![Screenshot-2026-06-13-060426.png](https://i.postimg.cc/g0PKJzQf/Screenshot-2026-06-13-060426.png)
+
 ## Configuring Argo CD for This Repository
 
 This project is best represented as three Argo CD Applications:
@@ -231,47 +236,22 @@ This project is best represented as three Argo CD Applications:
 
 Application names must be lowercase because Kubernetes resource names follow RFC 1123 naming rules.
 
-### Example: Dev Application Manifest
+## Deploying Kubernetes Manifests with Argo CD
 
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: kustomize-dev
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/opeyemiogungbe/kustomize-capstone.git
-    targetRevision: dev
-    path: overlay/dev
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: default
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-```
+Once the Argo CD applications are created, the deployment flow becomes:
 
-Apply it with:
+![Screenshot-2026-06-17-054937.png](https://i.postimg.cc/rFVsqvfN/Screenshot-2026-06-17-054937.png)
 
-```bash
-kubectl apply -f kustomize-dev.yaml
-```
+![Screenshot-2026-06-17-054959.png](https://i.postimg.cc/W1t4k0L8/Screenshot-2026-06-17-054959.png)
+
+
 
 Repeat the same pattern for staging and production:
 
 ```text
 kustomize-staging -> targetRevision: staging -> path: overlay/staging
-kustomize-prod    -> targetRevision: main    -> path: overlay/prod
 ```
-
-## Deploying Kubernetes Manifests with Argo CD
-
-Once the Argo CD applications are created, the deployment flow becomes:
+![Screenshot-2026-06-17-061313.png](https://i.postimg.cc/VsRsZKzt/Screenshot-2026-06-17-061313.png)
 
 1. Make a change in the correct branch.
 2. Push the branch to GitHub.
@@ -279,6 +259,14 @@ Once the Argo CD applications are created, the deployment flow becomes:
 4. Argo CD detects the Git state for the configured branch and path.
 5. Argo CD renders the Kustomize overlay.
 6. Argo CD applies the Kubernetes resources to EKS.
+
+E.g Changing cluster ip to load balancer to test if Argocd picks it up and allow us to access our node.js app on browser. 
+
+![Screenshot-2026-06-17-064350.png](https://i.postimg.cc/6q5hVMfY/Screenshot-2026-06-17-064350.png)
+
+![Screenshot-2026-06-17-062609.png](https://i.postimg.cc/sXzmxjQS/Screenshot-2026-06-17-062609.png)
+
+![Screenshot-2026-06-17-064724.png](https://i.postimg.cc/bY3gYjzq/Screenshot-2026-06-17-064724.png)
 
 You can manually preview any overlay before Argo CD deploys it:
 
