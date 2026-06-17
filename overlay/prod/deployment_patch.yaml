@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
         - name: app-container
-          image: myapp:latest
+          image: ghcr.io/opeyemiogungbe/kustomize-capstone:prod
           env:
             - name: APP_ENV
               value: production

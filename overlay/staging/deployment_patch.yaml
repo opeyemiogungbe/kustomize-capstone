@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
         - name: app-container
-          image: myapp:staging
+          image: ghcr.io/opeyemiogungbe/kustomize-capstone:staging
           env:
             - name: APP_ENV
               value: staging
