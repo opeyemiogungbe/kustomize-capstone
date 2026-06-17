@@ -1,9 +1,11 @@
 resources:
   - ../../base
 patches:
-  - replica_count.yaml
-  - deployment_patch.yaml
-  - service_patch.yaml
+  - path: replica_count.yaml
+  - path: deployment_patch.yaml
+  - path: service_patch.yaml
 labels:
-  env: staging  # Label applied to every resource
-namePrefix: staging-  # Prefix added to every resource
+  - pairs:
+      env: staging  # Label applied to every resource
+    includeSelectors: true
+namePrefix: staging-  # Prefix added to the name of all resources

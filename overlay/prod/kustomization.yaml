@@ -1,8 +1,10 @@
 resources:
   - ../../base
 patches:
-  - replica_count.yaml
-  - deployment_patch.yaml
+  - path: replica_count.yaml
+  - path: deployment_patch.yaml
 labels:
-  env: production  # Label applied to every resource
+  - pairs:
+      env: production  # Label applied to every resource
+    includeSelectors: true
 namePrefix: prod-  # Prefix added to the name of all resources
