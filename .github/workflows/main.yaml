@@ -23,6 +23,7 @@ permissions:
   packages: write
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   AWS_REGION: us-east-1
   EKS_CLUSTER: my-kustomize-cluster
   IMAGE_REGISTRY: ghcr.io
@@ -58,14 +59,14 @@ jobs:
         uses: imranismail/setup-kustomize@v1
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v5
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -98,9 +99,9 @@ jobs:
 
       - name: Deploy Kustomize
         run: |
-          mkdir -p /tmp/overlay
-          cp -R overlay/${{ steps.determine-env.outputs.ENVIRONMENT }} /tmp/overlay
-          cd /tmp/overlay/${{ steps.determine-env.outputs.ENVIRONMENT }}
+          mkdir -p /tmp/deploy
+          cp -R base overlay /tmp/deploy
+          cd /tmp/deploy/overlay/${{ steps.determine-env.outputs.ENVIRONMENT }}
           kustomize edit set image myapp=${{ env.IMAGE_URI }}
           kubectl apply -k .
 

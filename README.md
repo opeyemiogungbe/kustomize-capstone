@@ -1,122 +1,259 @@
-# 🚀 Advanced Kubernetes Configuration Management using Kustomize with AWS and integrating CI\CD.
 
-Managing Kubernetes applications across multiple environments can become complex as configurations grow and infrastructure scales. Kustomize provides a powerful, template-free approach to customizing Kubernetes manifests, enabling teams to manage environment-specific configurations while maintaining a single source of truth.
+# IMPLEMENTING A MULTI-ENVIRONMENT APPLICATION DEPLOYMENT WITH KUSTOMIZE
 
-This project demonstrates advanced Kubernetes configuration management using Kustomize on AWS (EKS). It showcases how to organize base configurations and environment-specific overlays, implement configuration customization, manage deployments across development and production environments, and automate application delivery through GitHub Actions CI/CD pipelines.
+## Table of Contents
+1. [Overview](#overview)
+2. [Project Structure](#project-structure)
+3. [Core Concepts](#core-concepts)
+4. [Getting Started](#getting-started)
+5. [The Application](#the-application)
+6. [Kustomize Base Configuration](#kustomize-base-configuration)
+7. [ConfigMaps and Secrets Management](#configmaps-and-secrets-management)
+8. [Environment Overlays](#environment-overlays)
+9. [Transformers and Generators](#transformers-and-generators)
+10. [CI/CD Pipeline Setup](#cicd-pipeline-setup)
+11. [Deployment Instructions](#deployment-instructions)
+12. [Security Best Practices](#security-best-practices)
 
-By leveraging Kubernetes, Kustomize, AWS EKS, and GitHub Actions, this project highlights modern DevOps practices for building scalable, maintainable, and repeatable cloud-native deployment workflows.
+---
 
+## Overview
 
-## 📁 Project Structure
+This project demonstrates a production-ready approach to managing Kubernetes deployments across multiple environments (development, staging, production) using **Kustomize**, a powerful template-free configuration customization tool.
 
-```
-.
-├── LICENSE
-├── README.md
-├── .github
-│   └── workflows
-│       └── main.yaml
-├── base
-│   ├── deployment.yaml
-│   └── kustomization.yaml
-└── overlay
-    ├── dev
-    │   ├── kustomization.yaml
-    │   └── replica_count.yaml
-    ├── staging
-    │   ├── kustomization.yaml
-    │   └── replica_count.yaml
-    └── prod
-        ├── kustomization.yaml
-        └── replica_count.yaml
-```
-This structure demonstrates a clean, environment-aware Kubernetes deployment using Kustomize overlays.
+### Why Kustomize?
 
-It includes:
-- A GitHub Actions workflow at `.github/workflows/main.yaml` to trigger any changes in the source code
-- A single reusable base manifest for one application
-- ConfigMap and Secret generation via Kustomize
-- Environment overlays for `dev`, `staging`, and `prod`
-- Resource name isolation with prefixes
-- Environment-specific replica counts and labels
+Kustomize solves the problem of duplicating Kubernetes manifest files for different environments. Instead of managing separate YAML files for dev, staging, and prod, Kustomize lets you:
+- Keep a single **base** configuration
+- Create lightweight **overlays** that customize the base for each environment
+- Avoid template complexity while maintaining clarity and reusability
 
-### Workflow trigger
-- Runs on `push` to the `dev`, `staging`, and `main` branches.
-- Supports manual deployment through `workflow_dispatch` with `dev`, `staging`, or `prod` input.
+### Project Goals
 
-### What the workflow does
-1. `actions/checkout@v4` checks out the repository.
-2. `actions/cache@v4` caches Docker build layers in `/tmp/.buildx-cache`.
-3. `aws-actions/configure-aws-credentials@v4` configures AWS credentials from GitHub secrets.
-4. `azure/setup-kubectl@v1` installs `kubectl`.
-5. `imranismail/setup-kustomize@v1` installs `kustomize`.
-6. The workflow runs `aws eks update-kubeconfig --region us-east-1 --name my-kustomize-cluster`.
-7. It verifies cluster access with `kubectl cluster-info` and `kubectl get nodes`.
-8. It deploys the `dev` overlay with `kubectl apply -k overlay/dev`.
+- ✅ Deploy a Node.js web application to Kubernetes
+- ✅ Manage environment-specific configurations efficiently
+- ✅ Secure sensitive data (secrets) properly
+- ✅ Automate deployment via GitHub Actions CI/CD
+- ✅ Build Docker images in the cloud (not locally)
+- ✅ Promote code through dev → staging → production
 
-![Screenshot-2026-06-09-105754.png](https://i.postimg.cc/cHZ0j53D/Screenshot-2026-06-09-105754.png)
+---
 
-![Screenshot-2026-06-09-105359.png](https://i.postimg.cc/Vvqt3ddf/Screenshot-2026-06-09-105359.png)
-
-We can see our action run successfully... NOTE: This Required GitHub secrets. to run this workflow, add these secrets to the repository:
+## Project Structure
 
 ```
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
+kustomize-capstone/
+├── LICENSE                          # Project license
+├── README.md                        # This file
+├── .gitignore                       # Git ignore rules
+├── .dockerignore                    # Docker build ignore rules
+├── .github/
+│   └── workflows/
+│       └── main.yaml               # GitHub Actions CI/CD pipeline
+├── app/
+│   └── index.js                    # Node.js web application
+├── base/
+│   ├── deployment.yaml             # Kubernetes Deployment manifest
+│   ├── service.yaml                # Kubernetes Service manifest
+│   └── kustomization.yaml          # Kustomize configuration (base)
+├── overlay/
+│   ├── dev/
+│   │   ├── kustomization.yaml      # Dev environment customizations
+│   │   ├── deployment_patch.yaml   # Dev deployment patch
+│   │   └── replica_count.yaml      # Dev replica count patch
+│   ├── staging/
+│   │   ├── kustomization.yaml      # Staging environment customizations
+│   │   ├── deployment_patch.yaml   # Staging deployment patch
+│   │   └── replica_count.yaml      # Staging replica count patch
+│   └── prod/
+│       ├── kustomization.yaml      # Production environment customizations
+│       ├── deployment_patch.yaml   # Production deployment patch
+│       └── replica_count.yaml      # Production replica count patch
+├── Dockerfile                      # Docker image definition
+└── package.json                    # Node.js dependencies
 ```
-![Screenshot-2026-06-11-071144.png](https://i.postimg.cc/8cWdYmYJ/Screenshot-2026-06-11-071144.png)
+![Screenshot-2026-06-12-120122.png](https://i.postimg.cc/KYVGjt0t/Screenshot-2026-06-12-120122.png)
 
-### Why this matters
-- Provides automated deployment validation on every change to `main`
-- Ensures the Kustomize path is executable in CI
-- Demonstrates AWS EKS integration with GitHub Actions
-- Helps catch deployment issues early
+### Explanation of Key Directories
 
-### Local web application
-This repository now includes a simple Node.js web application in the `app/` folder.
+| Directory | Purpose |
+|-----------|---------|
+| `base/` | Contains the core Kubernetes manifests shared across all environments |
+| `overlay/dev`, `overlay/staging`, `overlay/prod` | Environment-specific customizations that extend the base |
+| `app/` | The actual Node.js web application source code |
+| `.github/workflows/` | GitHub Actions CI/CD automation |
 
-To run it locally:
+---
+
+## Core Concepts
+
+### 1. Base Configuration
+The `base/` directory contains the **single source of truth** for your application:
+- Deployment specification (how the app runs)
+- Service definition (how the app is exposed)
+- ConfigMaps (non-sensitive configuration)
+- Secrets (sensitive data like credentials)
+
+All environments inherit from this base and only override what differs.
+
+### 2. Overlays
+An **overlay** is a directory that customizes the base for a specific environment:
+- It references the base configuration
+- It applies patches to modify resources
+- It adds environment-specific labels, prefixes, and environment variables
+
+Example: Production needs 1 replica, staging needs 2, dev needs 3 → each overlay sets its own replica count.
+
+### 3. Kustomization File
+The `kustomization.yaml` file is the glue that holds everything together. It defines:
+- Which resources to include
+- Which generators to use (ConfigMaps, Secrets)
+- Which patches to apply
+- Common labels and name prefixes
+
+### 4. Transformers
+Transformers modify resources globally:
+- **commonLabels**: Add the same label to all resources (e.g., `env: development`)
+- **namePrefix**: Add a prefix to all resource names (e.g., `dev-my-app`)
+- **commonAnnotations**: Add metadata to resources
+
+### 5. Generators
+Generators create resources dynamically:
+- **configMapGenerator**: Creates ConfigMaps from key-value pairs
+- **secretGenerator**: Creates Secrets from sensitive data
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Git
+- Docker (for building images)
+- kubectl (for Kubernetes operations)
+- Kustomize (v4.0+)
+- Node.js (for local development)
+- AWS account with EKS cluster (for deployment)
+- GitHub account with Actions enabled
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/opeyemiogungbe/Advance-configuration-management-with-kustomize-and-Aws.git
+   cd kustomize-capstone
+   ```
+
+2. **Install Node.js dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Install kubectl**
+   ```bash
+   # macOS
+   brew install kubectl
+   
+   # Linux
+   sudo snap install kubectl --classic
+   
+   # Windows
+   choco install kubernetes-cli
+   ```
+
+4. **Install Kustomize**
+   ```bash
+   # macOS
+   brew install kustomize
+   
+   # Linux
+   curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+   
+   # Windows
+   choco install kustomize
+   ```
+
+5. **Configure AWS credentials**
+   ```bash
+   aws configure
+   ```
+   Provide your AWS Access Key ID and Secret Access Key.
+
+6. **Configure kubectl for your EKS cluster**
+   ```bash
+   aws eks update-kubeconfig --region us-east-1 --name my-kustomize-cluster
+   ```
+
+---
+
+## The Application
+
+This project includes a simple **Node.js web application** that demonstrates environment-aware configuration.
+
+### Application Code (app/index.js)
+
+```javascript
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 80;
+const env = process.env.APP_ENV || 'development';
+const logLevel = process.env.LOG_LEVEL || 'info';
+
+app.get('/', (req, res) => {
+  res.send(`
+    <h1>Kustomize Capstone App</h1>
+    <p>Environment: ${env}</p>
+    <p>Log Level: ${logLevel}</p>
+  `);
+});
+
+app.listen(port, () => {
+  console.log(`App listening on port ${port} in ${env} mode`);
+});
+```
+
+The app reads environment variables (`APP_ENV`, `LOG_LEVEL`) that are injected via Kubernetes ConfigMaps and Secrets.
+
+### Building the Docker Image
+
 ```bash
-npm install
-npm start
-```
-
-To build the Docker image locally:
-```bash
+# Build locally for testing
 docker build -t myapp:latest .
+
+# Run locally
+docker run -p 80:80 -e APP_ENV=development myapp:latest
+
+# Visit http://localhost
 ```
 
-To run the container locally:
-```bash
-docker run -p 80:80 myapp:latest
-```
+**In the CI/CD pipeline**, Docker images are built automatically and pushed to GitHub Container Registry.
 
-The application reads environment variables from the overlay patches and displays the current environment and log level in the browser.
+---
 
-### CI/CD packaging for dev
-The GitHub Actions workflow now builds and pushes a Docker image to GitHub Container Registry and then deploys the `dev` overlay when the pipeline runs on the `dev` branch.
+## Kustomize Base Configuration
 
-The workflow creates an image tag from the current commit SHA and uses that exact image when deploying.
+### base/deployment.yaml
 
-### Base configuration
-
-## `base/deployment.yaml`
-A minimal deployment for the app:
+This is the core Kubernetes Deployment manifest:
 
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: my-app
+
 spec:
   replicas: 2
+
   selector:
     matchLabels:
       app: my-app
+
   template:
     metadata:
       labels:
         app: my-app
+
     spec:
       containers:
         - name: app-container
@@ -126,21 +263,47 @@ spec:
           envFrom:
             - secretRef:
                 name: my-secret
+            - configMapRef:
+                name: my-app-config
 ```
 
-The `base/` directory contains the core application resources used by all environments. `base/deployment.yaml` defines a single `Deployment` named `my-app`. The base deployment consumes the secret with:
+**Key points:**
+- `replicas: 2` is the default; overlays will override this
+- `envFrom` injects all secrets and ConfigMap entries as environment variables
+- This keeps the deployment simple and reusable
+
+### base/service.yaml
+
+Exposes the application inside the Kubernetes cluster:
 
 ```yaml
-envFrom:
-  - secretRef:
-      name: my-secret
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+spec:
+  selector:
+    app: my-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: ClusterIP
 ```
 
-## `base/kustomization.yaml`
-Generates config and secret resources and includes the deployment:
+**Key points:**
+- `ClusterIP` type means the app is only accessible within the cluster
+- Port 80 is exposed to other services in the cluster
+
+### base/kustomization.yaml
+
+The orchestrator for all base resources:
+
 ```yaml
 resources:
   - deployment.yaml
+  - service.yaml
+
 configMapGenerator:
 - name: my-configmap
   literals:
@@ -150,193 +313,593 @@ configMapGenerator:
   literals:
   - app_name=MyKustomizeApp
   - log_level=debug
+
 secretGenerator:
 - name: my-secret
   literals:
   - username=admin
   - password=s3cr3t
+
+generatorOptions:
+  disableNameSuffixHash: true
 ```
-- `base/kustomization.yaml` includes the base deployment and generates:
-  - a `ConfigMap` named `my-configmap`
-  - a second `ConfigMap` named `my-app-config`
-  - a `Secret` named `my-secret`
 
-Kustomize rewrites this reference to the generated hashed secret name automatically.
+**Key points:**
+- `resources` lists the base manifests to include
+- `configMapGenerator` creates ConfigMaps from key-value pairs
+- `secretGenerator` creates Secrets from key-value pairs
+- `disableNameSuffixHash: true` keeps resource names stable (Kustomize by default appends hashes)
 
-### ConfigMaps and Secrets
-The base Kustomize configuration uses generator blocks:
+---
 
-- `configMapGenerator`
-  - `my-configmap` contains `key1=value1` and `key2=value2`
-  - `my-app-config` contains `app_name=MyKustomizeApp` and `log_level=debug`
-- `secretGenerator`
-  - `my-secret` contains base64-encoded `username=admin` and `password=s3cr3t`
+## ConfigMaps and Secrets Management
 
-This enables configuration separation without hardcoding sensitive values inside the deployment manifest.
+### ConfigMaps: Non-Sensitive Data
 
-### Environment overlays
-
-Each overlay directory customizes the base for a specific environment. Each overlay references the base and patches the replica count.
-
-#### `overlay/dev/kustomization.yaml`:
+ConfigMaps store **non-sensitive configuration** like application settings:
 
 ```yaml
-bases:
+configMapGenerator:
+- name: my-app-config
+  literals:
+  - app_name=MyKustomizeApp
+  - log_level=debug
+  - max_connections=100
+  - api_endpoint=https://api.example.com
+```
+
+These values become environment variables in the pod:
+```
+APP_NAME=MyKustomizeApp
+LOG_LEVEL=debug
+MAX_CONNECTIONS=100
+API_ENDPOINT=https://api.example.com
+```
+
+### Secrets: Sensitive Data
+
+Secrets store **sensitive data** like passwords and API keys:
+
+```yaml
+secretGenerator:
+- name: my-secret
+  literals:
+  - username=admin
+  - password=s3cr3t
+  - api_key=sk-1234567890abcdef
+  - db_password=supersecretpassword
+```
+
+---
+
+## Security Best Practices
+
+### ⚠️ NEVER hardcode secrets in version control!
+
+#### ❌ Bad Practice
+```yaml
+# This EXPOSES your secrets to anyone with repo access!
+secretGenerator:
+- name: my-secret
+  literals:
+  - password=my-actual-password
+```
+
+#### ✅ Good Practice: Use External Secret Management
+
+**Option 1: Use Sealed Secrets or External Secrets Operator**
+```bash
+# Install External Secrets Operator
+helm repo add external-secrets https://external-secrets.io
+helm install external-secrets external-secrets/external-secrets -n external-secrets-system --create-namespace
+```
+
+Then reference secrets from AWS Secrets Manager, HashiCorp Vault, etc.
+
+**Option 2: GitHub Secrets + CI/CD**
+Store secrets in GitHub Repository Settings → Secrets:
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `DB_PASSWORD`
+- `API_KEY`
+
+Reference them in CI/CD:
+```yaml
+- name: Deploy
+  env:
+    DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+```
+
+**Option 3: Kubernetes Secret Encryption**
+Enable encryption at rest in your EKS cluster:
+```bash
+aws eks create-cluster ... --encryption-config resources=secrets providers=[{provider:{keyArn=arn:aws:kms:...}}]
+```
+
+### Audit and Rotation
+
+1. **Rotate secrets regularly** (e.g., every 90 days)
+2. **Use IAM roles** instead of long-lived access keys
+3. **Enable CloudTrail** to audit secret access
+4. **Limit secret scope** to specific environments (dev ≠ prod)
+
+---
+
+## Environment Overlays
+
+Each environment (dev, staging, prod) has a customized overlay that modifies the base configuration.
+
+### overlay/dev/kustomization.yaml
+
+```yaml
+resources:
   - ../../base
+
 patchesStrategicMerge:
   - replica_count.yaml
+  - deployment_patch.yaml
+
 commonLabels:
   env: development
+
 namePrefix: dev-
 ```
-`overlay/dev/replica_count.yaml` changes the replica count to `3`. After our initial CI\CD action, we decided to change replica count from 1-3 to see if our GitHub action runs successfully..
 
-![Screenshot-2026-06-09-105043.png](https://i.postimg.cc/63Gbr9qY/Screenshot-2026-06-09-105043.png)
+**What this does:**
+1. Includes the base configuration
+2. Applies patches (replica count and deployment settings)
+3. Adds `env: development` label to all resources
+4. Prefixes all resource names with `dev-` (e.g., `dev-my-app`)
 
-We commit and push to the main repository to see if it triggers
-
-![Screenshot-2026-06-09-105234.png](https://i.postimg.cc/tg82CLkn/Screenshot-2026-06-09-105234.png)
-
-And yes, we got a successful trigger.
-
-![Screenshot-2026-06-09-105429.png](https://i.postimg.cc/tgFVWwy4/Screenshot-2026-06-09-105429.png)
-
-#### `overlay/staging/kustomization.yaml`
+### overlay/dev/replica_count.yaml
 
 ```yaml
-bases:
-  - ../../base
-patchesStrategicMerge:
-  - replica_count.yaml
-commonLabels:
-  env: staging
-namePrefix: staging-
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  replicas: 3
 ```
 
-`overlay/staging/replica_count.yaml` sets `replicas: 2`.
+**Purpose:** Override the base replica count. Dev runs 3 replicas for testing high availability.
 
-
-#### `overlay/prod/kustomization.yaml`
+### overlay/dev/deployment_patch.yaml
 
 ```yaml
-bases:
-  - ../../base
-patchesStrategicMerge:
-  - replica_count.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: app-container
+          image: myapp:dev
+          env:
+            - name: APP_ENV
+              value: development
+            - name: LOG_LEVEL
+              value: debug
+```
+
+**Purpose:** Set environment-specific image tag and variables.
+
+---
+
+### overlay/staging/
+
+**Staging is a pre-production mirror:**
+- Replica count: 2
+- Image tag: `myapp:staging`
+- Log level: `info`
+- Closer to production settings for realistic testing
+
+### overlay/prod/
+
+**Production is the safest environment:**
+- Replica count: 1 (or higher for redundancy)
+- Image tag: `myapp:latest` (pinned to specific version in real world)
+- Log level: `warn`
+- Maximum security and stability
+
+---
+
+## Transformers and Generators
+
+### Transformers: Global Modifications
+
+#### 1. Common Labels
+
+Add a label to **every resource** in an environment:
+
+```yaml
+# overlay/prod/kustomization.yaml
 commonLabels:
   env: production
+  team: platform
+  cost-center: engineering
+```
+
+**Result:**
+```yaml
+# All resources get these labels
+metadata:
+  labels:
+    app: my-app
+    env: production
+    team: platform
+    cost-center: engineering
+```
+
+**Use cases:**
+- Cost allocation (tag by team)
+- Environment tracking
+- Automation (auto-scale based on env label)
+
+#### 2. Common Annotations
+
+Add metadata that doesn't affect Kubernetes behavior:
+
+```yaml
+# overlay/prod/kustomization.yaml
+commonAnnotations:
+  documentation: "https://wiki.example.com/my-app"
+  slack-channel: "#platform-alerts"
+  maintained-by: "devops-team"
+```
+
+**Use cases:**
+- Documentation links
+- Alert routing
+- Audit trails
+
+#### 3. Name Prefix
+
+Isolate resources by environment:
+
+```yaml
+# overlay/dev/kustomization.yaml
+namePrefix: dev-
+
+# overlay/prod/kustomization.yaml
 namePrefix: prod-
 ```
 
-`overlay/prod/replica_count.yaml` sets `replicas: 1`.
+**Result:**
+- Dev: `dev-my-app`, `dev-my-app-config`, etc.
+- Prod: `prod-my-app`, `prod-my-app-config`, etc.
 
-Each overlay currently applies:
+This prevents naming conflicts if multiple environments share a cluster.
 
-- `namePrefix` to isolate resources across environments
-- `commonLabels` to add an `env` label
-- `patchesStrategicMerge` to set environment-specific replica counts
+### Generators: Dynamic Resource Creation
 
-Example behavior:
-- `dev` deploys `dev-my-app`
-- `staging` deploys `staging-my-app`
-- `prod` deploys `prod-my-app`
+#### ConfigMap Generator
+
+Create a ConfigMap from key-value pairs:
+
+```yaml
+configMapGenerator:
+- name: my-app-config
+  literals:
+  - app_name=MyApp
+  - api_url=https://api.example.com
+  - max_retries=3
+  - timeout=30
+```
+
+**Generated Kubernetes object:**
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-app-config
+data:
+  app_name: MyApp
+  api_url: https://api.example.com
+  max_retries: "3"
+  timeout: "30"
+```
+
+#### Secret Generator
+
+Create a Secret from sensitive key-value pairs:
+
+```yaml
+secretGenerator:
+- name: my-secret
+  literals:
+  - username=admin
+  - password=mysecret
+```
+
+**Generated Kubernetes object:**
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-secret
+type: Opaque
+data:
+  username: YWRtaW4=           # base64 encoded
+  password: bXlzZWNyZXQ=       # base64 encoded
+```
+
+**Note:** Base64 encoding is **not encryption**. Use Sealed Secrets or External Secrets for real security.
 
 ---
 
-## ✅ How to use this project
+## CI/CD Pipeline Setup
 
-### Preview rendered resources
-Render an overlay without applying it:
-```bash
-kubectl kustomize overlay/dev
-kubectl kustomize overlay/staging
-kubectl kustomize overlay/prod
+This project uses **GitHub Actions** to automate building and deploying your application.
+
+### GitHub Secrets Configuration
+
+1. **Navigate to your repository**
+   - Click `Settings` → `Secrets and variables` → `Actions`
+
+2. **Add AWS credentials**
+   ```
+   AWS_ACCESS_KEY_ID: <your AWS access key>
+   AWS_SECRET_ACCESS_KEY: <your AWS secret key>
+   ```
+
+![Screenshot-2026-06-11-071144.png](https://i.postimg.cc/8cWdYmYJ/Screenshot-2026-06-11-071144.png)
+
+3. **Optional: Add other secrets**
+   ```
+   DOCKER_USERNAME: <Docker Hub username>
+   DOCKER_PASSWORD: <Docker Hub password>
+   DB_PASSWORD: <database password>
+   ```
+
+### GitHub Actions Workflow (.github/workflows/main.yaml)
+
+The workflow automatically:
+
+1. **Triggers on push** to dev, staging, or main branch
+2. **Builds Docker image** in the cloud
+3. **Pushes to GitHub Container Registry** (GHCR)
+4. **Determines environment** based on branch name
+5. **Deploys with Kustomize** to the appropriate EKS cluster
+
+```yaml
+name: Build and deploy with kustomize
+on:
+  push:
+    branches:
+      - dev
+      - staging
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        options: [dev, staging, prod]
 ```
 
-### Apply an environment
-```bash
-kubectl apply -k overlay/dev
-kubectl apply -k overlay/staging
-kubectl apply -k overlay/prod
-```
+### Workflow Steps Explained
 
-### Inspect generated resources
-After rendering, Kustomize produces hashed names for generated configmaps and secrets.
-For example, `my-secret` becomes something like `staging-my-secret-b892bc2827`.
+| Step | Purpose |
+|------|---------|
+| Checkout code | Pulls your repository |
+| Cache Docker layers | Speeds up builds by caching |
+| Configure AWS credentials | Authenticates with AWS |
+| Set up Kubectl | Installs kubectl for cluster access |
+| Setup Kustomize | Installs Kustomize tool |
+| Log in to GHCR | Authenticates with GitHub Container Registry |
+| Build and push image | Builds Docker image and pushes to registry |
+| Determine environment | Decides which overlay to deploy (dev/staging/prod) |
+| Deploy with Kustomize | Applies the configuration to the cluster |
 
-### Validate the staging environment first
-Use staging to test before promoting values to production:
-```bash
-kubectl apply -k overlay/staging
-kubectl get deployments,configmaps,secrets -l env=staging
-kubectl get pods -l env=staging
-```
-
-## 🧪 What this repository demonstrates
-
-- CI/CD integration with GitHub
-- Kustomize enables environment-based Kubernetes deployments
-- Implemented Caching in CI\CD pipeline
-- ConfigMaps = application configuration
-- Secrets = sensitive credentials
-- AWS EKS integration
 ---
 
-## 📌 Notes and next improvements
+### Cloud Deployment with CI/CD
 
-### Current Kustomize syntax
-This repo currently uses older overlay syntax:
-- `bases` (deprecated) instead of `resources.`
-- `commonLabels` (deprecated) instead of `labels.`
-- `patchesStrategicMerge` (deprecated) instead of `patches.`
+#### Step 1: Initialize Git Repository
 
-To modernize the overlays, run:
 ```bash
-kustomize edit fix overlay/dev
-kustomize edit fix overlay/staging
-kustomize edit fix overlay/prod
+# Create dev branch
+git checkout -b dev
+
+# Add all files
+git add .
+
+# Commit changes
+git commit -m "initial kustomize setup"
+
+# Push to dev branch
+git push origin dev
 ```
 
-### Future enhancements
-- Add a `Service` manifest for application exposure
-- Add environment-specific image tag overrides
-- Add a `namespace` field per overlay
-- Expand to multiple applications/services using app-specific bases
-- Add `kustomization.yaml` at root for multi-app aggregated deployment
+#### Step 2: Monitor GitHub Actions
+
+1. Go to your GitHub repository
+2. Click `Actions` tab
+3. Watch the workflow run:
+   - ✅ Checkout
+   - ✅ Build Docker image
+   - ✅ Push to GHCR
+   - ✅ Deploy to dev cluster
+
+![Screenshot-2026-06-12-105112.png](https://i.postimg.cc/rsfwN7qH/Screenshot-2026-06-12-105112.png)
+
+#### Step 3: Verify Deployment
+
+```bash
+# Check pods in your EKS cluster
+kubectl describe deployment dev-my-app
+
+![Screenshot-2026-06-12-105745.png](https://i.postimg.cc/mrkJPqnQ/Screenshot-2026-06-12-105745.png)
+
+# Access the service
+kubectl port-forward svc/dev-my-app 8080:80
+# Visit http://localhost:8080
+```
+![Screenshot-2026-06-12-110139.png](https://i.postimg.cc/CLMNM8Xn/Screenshot-2026-06-12-110139.png)
+
+![Screenshot-2026-06-12-110218.png](https://i.postimg.cc/g2X3rHD0/Screenshot-2026-06-12-110218.png)
+
+#### Step 4: Promote to Staging
+
+```bash
+# Create staging branch
+git checkout -b staging
+
+# Push to staging
+git push origin staging
+
+# GitHub Actions automatically deploys to staging overlay!
+```
+![Screenshot-2026-06-12-113221.png](https://i.postimg.cc/d3gtfrT2/Screenshot-2026-06-12-113221.png)
+
+![Screenshot-2026-06-12-114851.png](https://i.postimg.cc/Sj0kd4Bj/Screenshot-2026-06-12-114851.png)
+
+#### Step 5: Promote to Production
+
+```bash
+# Create or push to main branch
+git checkout -b main
+
+# Push to main
+git push origin main
+
+# GitHub Actions automatically deploys to prod overlay!
+```
+
+## Advanced Usage
+
+### Customizing Overlays
+
+#### Example: Add Database Configuration per Environment
+
+Create `overlay/prod/db-config-patch.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-config
+data:
+  database_host: prod-db.example.com
+  database_port: "5432"
+  database_name: myapp_prod
+  connection_pool_size: "50"
+```
+
+Update `overlay/prod/kustomization.yaml`:
+
+```yaml
+resources:
+  - ../../base
+  - db-config-patch.yaml  # Add this line
+```
+
+#### Example: Different Replica Counts
+
+**Dev:** Fast feedback, fewer resources
+```yaml
+# overlay/dev/replica_count.yaml
+spec:
+  replicas: 1
+```
+
+**Staging:** Mirror production
+```yaml
+# overlay/staging/replica_count.yaml
+spec:
+  replicas: 3
+```
+
+**Production:** High availability
+```yaml
+# overlay/prod/replica_count.yaml
+spec:
+  replicas: 5
+```
+
+### Using Kustomize Edit Commands
+
+```bash
+# Set image across all overlays
+kustomize edit set image myapp=myregistry.azurecr.io/myapp:v1.0
+
+# Add a label to an overlay
+kustomize edit add label version:1.0
+
+# Set namespace
+kustomize edit set namespace production
+```
 
 ---
 
-## 💡 Recommended extension for multi-app scale
-When this project grows beyond one app, use a structure like:
+## Troubleshooting
 
+### Issue: "Unrecognized named-value: 'env'"
+
+**Cause:** GitHub Actions variable reference syntax issue.
+
+**Solution:** Use `${{ env.VARIABLE_NAME }}` in workflow, not `env.VARIABLE_NAME`.
+
+```yaml
+# ❌ Wrong
+tags: env.IMAGE_REGISTRY/myapp:latest
+
+# ✅ Correct
+tags: ${{ env.IMAGE_REGISTRY }}/myapp:latest
 ```
-apps/
-  frontend/
-    base/
-    overlay/
-  backend/
-    base/
-    overlay/
-common/
-  base/
+
+### Issue: Pod fails to start with ImagePullBackOff
+
+**Cause:** Kubernetes can't pull the Docker image from the registry.
+
+**Solution:**
+```bash
+# Check image exists in registry
+docker pull ghcr.io/username/kustomize-capstone:imagetag
+
+# Create image pull secret if needed
+kubectl create secret docker-registry ghcr-secret \
+  --docker-server=ghcr.io \
+  --docker-username=username \
+  --docker-password=token
 ```
 
-Each app gets its own base and overlays, and root overlays can compose them together.
+### Issue: ConfigMap/Secret not updating in pods
 
-## 📌 Future Improvements
-Add Helm charts for abstraction
+**Cause:** Kubernetes doesn't automatically restart pods when ConfigMaps change.
 
-Use AWS Secrets Manager instead of K8s Secrets
+**Solution:** Restart deployment to pick up new config:
+```bash
+kubectl rollout restart deployment/dev-my-app
+```
 
-Implement ArgoCD GitOps deployment
+---
 
-Add monitoring (Prometheus + Grafana)
+## Summary
 
-## 👨‍💻 Author: Ope ogungbe
+This project demonstrates a complete, production-ready workflow for multi-environment Kubernetes deployments:
 
-Built as part of DevOps learning journey focusing on:
+✅ **Single Source of Truth** - Base configuration for all environments  
+✅ **Lightweight Overlays** - Environment-specific customizations  
+✅ **Security** - Proper secrets management and encryption  
+✅ **Automation** - GitHub Actions CI/CD pipeline  
+✅ **Scalability** - Easy to add new environments  
+✅ **Best Practices** - Industry-standard deployment patterns  
 
-Kubernetes
-AWS EKS
-CI/CD pipelines
-Infrastructure as Code
+---
+
+## Resources
+
+- [Kustomize Official Documentation](https://kustomize.io/)
+- [Kubernetes Documentation](https://kubernetes.io/docs/)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
+- [AWS EKS Best Practices](https://aws.github.io/aws-eks-best-practices/)
+- [12 Factor App](https://12factor.net/) - Configuration management principles
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
